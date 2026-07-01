@@ -1,0 +1,28 @@
+@page
+@model LoginModel
+@{
+    ViewData["Title"] = "ScubaHub Admin — Login";
+}
+
+<div class="screen">
+    <div class="card">
+        <p class="label">RESTRICTED</p>
+        <h1 class="login-title">ScubaHub Admin</h1>
+
+        <form method="post">
+            <input class="input"
+                   type="password"
+                   asp-for="Password"
+                   placeholder="Admin password"
+                   autofocus
+                   required />
+
+            @if (!string.IsNullOrEmpty(Model.Error))
+            {
+                <p class="error">@Model.Error</p>
+            }
+
+            <button class="button" type="submit">Enter</button>
+        </form>
+    </div>
+</div>

@@ -1,0 +1,14 @@
+@page
+@model ErrorModel
+@{
+    ViewData["Title"] = "Error";
+}
+
+<div class="screen">
+    <div class="card">
+        <p class="label">ERROR</p>
+        <h1 class="login-title">Something went wrong</h1>
+        <p class="loading">An unexpected error occurred while processing your request.</p>
+        <a class="edit-btn" asp-page="/Dashboard">Back to dashboard</a>
+    </div>
+</div>

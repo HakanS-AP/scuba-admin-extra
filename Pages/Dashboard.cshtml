@@ -1,0 +1,99 @@
+@page
+@model DashboardModel
+@{
+    ViewData["Title"] = "ScubaHub Admin — Dashboard";
+}
+
+<div class="shell">
+    <header class="header">
+        <div class="header-left">
+            <span class="badge">ADMIN</span>
+            <span class="app-title">ScubaHub</span>
+        </div>
+        <form method="post" asp-page="/Logout">
+            <button class="logout-btn" type="submit">Log out</button>
+        </form>
+    </header>
+
+    <main class="main">
+        <h2 class="section-title">Weather Forecast</h2>
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <p class="error">@Model.Error</p>
+        }
+
+        @* A <form> can't legally wrap <td>s inside a <tr>, so the edit form
+           lives here and the inputs in the editing row bind to it via form="editForm"
+           (HTML5). Only one row is editable at a time, so one form suffices. *@
+        @if (Model.EditingIndex >= 0)
+        {
+            <form id="editForm" method="post" asp-page-handler="Save">
+                <input type="hidden" name="index" value="@Model.EditingIndex" />
+            </form>
+        }
+
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Temp (°C)</th>
+                        <th>Temp (°F)</th>
+                        <th>Summary</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @for (var i = 0; i < Model.Forecasts.Count; i++)
+                {
+                    var row = Model.Forecasts[i];
+                    var isEditing = Model.EditingIndex == i;
+
+                    <tr class="@(isEditing ? "editing-row" : null)">
+                        <td>@row.Date</td>
+
+                        <td>
+                            @if (isEditing)
+                            {
+                                <input class="edit-input" type="number" form="editForm"
+                                       name="temperatureC" value="@row.TemperatureC" />
+                            }
+                            else
+                            {
+                                @row.TemperatureC
+                            }
+                        </td>
+
+                        <td>@row.TemperatureF</td>
+
+                        <td>
+                            @if (isEditing)
+                            {
+                                <input class="edit-input" type="text" form="editForm"
+                                       name="summary" value="@row.Summary" />
+                            }
+                            else
+                            {
+                                @row.Summary
+                            }
+                        </td>
+
+                        <td class="actions">
+                            @if (isEditing)
+                            {
+                                <button class="save-btn" type="submit" form="editForm">Save</button>
+                                <a class="cancel-btn" asp-page="/Dashboard">Cancel</a>
+                            }
+                            else
+                            {
+                                <a class="edit-btn" asp-page="/Dashboard" asp-route-edit="@i">Edit</a>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>

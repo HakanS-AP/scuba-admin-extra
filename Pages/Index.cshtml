@@ -1,0 +1,6 @@
+@page
+@{
+    // Catch-all landing: authenticated users go to the dashboard, everyone else
+    // is redirected to login by the auth middleware before reaching here.
+    Response.Redirect("/Dashboard");
+}
