@@ -63,28 +63,57 @@ var app = builder.Build();
 //      can forge this header with the (public) cert and pass.
 // Skipped in Development — there is no Azure front end locally to inject the
 // header, so leaving it on would 403 every request (including static files).
+var gateLogger = app.Services.GetRequiredService<ILoggerFactory>()
+                             .CreateLogger("CertGate");
 app.Use(async (context, next) =>
     {
         // Azure WebApp serves the certificate through the X-ARR-ClientCert header field
         var header = context.Request.Headers["X-ARR-ClientCert"].FirstOrDefault();
-        if (string.IsNullOrEmpty(header)) { context.Response.StatusCode = 403; return; }
+        if (string.IsNullOrEmpty(header))
+        {
+            gateLogger.LogWarning("403: X-ARR-ClientCert header missing.");
+            context.Response.StatusCode = 403; return;
+        }
         try
         {
             using var cert = X509CertificateLoader.LoadCertificate(Convert.FromBase64String(header));
             var expected = Environment.GetEnvironmentVariable("CF_CLIENT_THUMBPRINT");
-            var now = DateTime.UtcNow;
-            if (!string.Equals(cert.Thumbprint, expected, StringComparison.OrdinalIgnoreCase)
-                || now < cert.NotBefore.ToUniversalTime()
-                || now > cert.NotAfter.ToUniversalTime())
+
+            if (string.IsNullOrEmpty(expected))
             {
-                context.Response.StatusCode = 403;
-                return;
+                gateLogger.LogWarning("403: CF_CLIENT_THUMBPRINT env var is not set.");
+                context.Response.StatusCode = 403; return;
+            }
+            // cert.Thumbprint is 40 hex chars, uppercase, no separators. Values
+            // copied from Azure Portal / openssl / browsers usually carry colons
+            // or spaces (e.g. "CC:09:...:84"), so normalize BOTH sides to hex-only
+            // before comparing — otherwise a correct thumbprint fails on format alone.
+            static string NormalizeThumbprint(string s) =>
+                new string(s.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
+
+            if (NormalizeThumbprint(cert.Thumbprint) != NormalizeThumbprint(expected))
+            {
+                // Thumbprints are public info, safe to log. A 64-char normalized
+                // expected = SHA-256 (wrong algorithm — .Thumbprint is always SHA-1).
+                gateLogger.LogWarning(
+                    "403: thumbprint mismatch. actual='{Actual}', expected(normalized len {ExpectedLen}).",
+                    cert.Thumbprint, NormalizeThumbprint(expected).Length);
+                context.Response.StatusCode = 403; return;
+            }
+
+            var now = DateTime.UtcNow;
+            if (now < cert.NotBefore.ToUniversalTime() || now > cert.NotAfter.ToUniversalTime())
+            {
+                gateLogger.LogWarning(
+                    "403: cert outside validity window. now={Now:o}, notBefore={NotBefore:o}, notAfter={NotAfter:o}.",
+                    now, cert.NotBefore.ToUniversalTime(), cert.NotAfter.ToUniversalTime());
+                context.Response.StatusCode = 403; return;
             }
         }
-        catch
+        catch (Exception ex)
         {
-            context.Response.StatusCode = 403;
-            return;
+            gateLogger.LogWarning(ex, "403: failed to parse X-ARR-ClientCert header (not valid base64 DER?).");
+            context.Response.StatusCode = 403; return;
         }
         await next();
     });
